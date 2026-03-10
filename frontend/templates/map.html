@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}ISRO Live Map{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  #mapWrap { position:relative; height:calc(100vh - 130px); border-radius:16px; overflow:hidden; border:1px solid var(--border); }
+  #map { height:100%; width:100%; background:#03060a; }
+  .map-legend {
+    position:absolute; top:16px; right:16px; z-index:1000;
+    background:rgba(7,15,26,.92); border:1px solid var(--border);
+    border-radius:12px; padding:16px 20px; backdrop-filter:blur(10px);
+    min-width:200px;
+  }
+  .map-legend h4 { font-family:var(--font-display); font-size:.68rem; color:var(--accent); letter-spacing:.15em; margin-bottom:12px; }
+  .legend-item { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-family:var(--font-mono); font-size:.68rem; color:var(--muted); }
+  .legend-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+  .map-panel {
+    position:absolute; top:16px; left:16px; z-index:1000;
+    background:rgba(7,15,26,.92); border:1px solid var(--border);
+    border-radius:12px; padding:14px; backdrop-filter:blur(10px); min-width:220px;
+  }
+  .map-panel h4 { font-family:var(--font-display); font-size:.65rem; color:var(--accent); letter-spacing:.15em; margin-bottom:10px; }
+  .map-toggle { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .map-toggle label { font-family:var(--font-mono); font-size:.68rem; color:var(--muted); }
+  .toggle { width:36px; height:20px; background:var(--border); border-radius:10px; cursor:pointer; position:relative; transition:background .2s; }
+  .toggle.on { background:var(--accent); }
+  .toggle::after { content:''; position:absolute; width:14px; height:14px; border-radius:50%; background:#fff; top:3px; left:3px; transition:transform .2s; }
+  .toggle.on::after { transform:translateX(16px); }
+  .sat-counter { font-family:var(--font-display); font-size:1.4rem; font-weight:800; color:#fff; margin-bottom:2px; }
+  .sat-label   { font-family:var(--font-mono); font-size:.62rem; color:var(--muted); letter-spacing:.12em; }
+
+  /* Custom marker popup */
+  .leaflet-popup-content-wrapper {
+    background:rgba(7,15,26,.96) !important; border:1px solid var(--border) !important;
+    border-radius:10px !important; color:var(--text) !important; box-shadow:var(--glow) !important;
+  }
+  .leaflet-popup-tip { background:var(--panel) !important; }
+  .popup-title { font-family:var(--font-display); font-size:.8rem; color:var(--accent); margin-bottom:8px; }
+  .popup-row   { font-family:var(--font-mono); font-size:.72rem; color:var(--muted); margin-bottom:4px; }
+  .popup-row span { color:var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page" style="padding-top:20px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div>
+      <div style="font-family:var(--font-display);font-size:1rem;font-weight:800;color:#fff">ISRO LIVE TRACKING MAP</div>
+      <div style="font-family:var(--font-mono);font-size:.7rem;color:var(--muted);margin-top:3px">
+        Launch centres, orbital tracks &amp; satellite positions
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <div style="text-align:right">
+        <div class="sat-counter" id="centreCount">0</div>
+        <div class="sat-label">ACTIVE CENTRES</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="mapWrap">
+    <div id="map"></div>
+
+    <!-- Controls panel -->
+    <div class="map-panel">
+      <h4>MAP LAYERS</h4>
+      <div class="map-toggle">
+        <label>ISRO CENTRES</label>
+        <div class="toggle on" id="tCentres" onclick="toggleLayer('centres')"></div>
+      </div>
+      <div class="map-toggle">
+        <label>LAUNCH SITES</label>
+        <div class="toggle on" id="tSites" onclick="toggleLayer('sites')"></div>
+      </div>
+      <div class="map-toggle">
+        <label>ORBITAL TRACKS</label>
+        <div class="toggle on" id="tOrbits" onclick="toggleLayer('orbits')"></div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="map-legend">
+      <h4>LEGEND</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:#00d4ff"></div> ISRO Centre</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ff5722"></div> Launch Site</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#00ff88"></div> LEO Track</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ffd700"></div> GEO Track</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#c77dff"></div> SSO Track</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Leaflet dark tile ──
+const map = L.map('map', { zoomControl:true, attributionControl:false });
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  maxZoom:18, attribution:'&copy; CARTO'
+}).addTo(map);
+map.setView([20.5937, 78.9629], 4);   // Center on India
+
+// ── Custom icons ──
+function makeIcon(emoji, color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:34px;height:34px;border-radius:50%;
+      background:${color}22;border:2px solid ${color};
+      display:flex;align-items:center;justify-content:center;
+      font-size:16px;box-shadow:0 0 12px ${color}66;cursor:pointer">${emoji}</div>`,
+    iconSize:[34,34], iconAnchor:[17,17], popupAnchor:[0,-20]
+  });
+}
+
+const layers = { centres: L.layerGroup(), sites: L.layerGroup(), orbits: L.layerGroup() };
+Object.values(layers).forEach(l => l.addTo(map));
+
+function toggleLayer(name) {
+  const t = document.getElementById('t'+name.charAt(0).toUpperCase()+name.slice(1));
+  if (map.hasLayer(layers[name])) { map.removeLayer(layers[name]); t.classList.remove('on'); }
+  else { layers[name].addTo(map); t.classList.add('on'); }
+}
+
+// ── Load centres from API ──
+async function loadCentres() {
+  const r = await fetch('/api/centres');
+  const d = await r.json();
+  document.getElementById('centreCount').textContent = d.data.length;
+
+  d.data.forEach(c => {
+    if (!c.lat || !c.lon) return;
+    const marker = L.marker([c.lat, c.lon], { icon: makeIcon('🏭','#00d4ff') });
+    marker.bindPopup(`
+      <div class="popup-title">${c.name} — ${c.full_name||''}</div>
+      <div class="popup-row">📍 Location: <span>${c.location||'–'}</span></div>
+      <div class="popup-row" style="margin-top:6px;font-size:.68rem">${c.description||''}</div>
+    `);
+    layers.centres.addLayer(marker);
+  });
+}
+
+// ── Launch sites ──
+const launchSites = [
+  { name:'Satish Dhawan Space Centre (SHAR)', lat:13.7199, lon:80.2304, rockets:'PSLV, GSLV, LVM3, SSLV', info:'Primary spaceport — all ISRO launches' },
+  { name:'Thumba Equatorial Rocket Launch Station', lat:8.5241, lon:76.8767, rockets:'Sounding rockets', info:'First Indian rocket launch site (1963)' },
+  { name:'Dr. Abdul Kalam Island (Wheeler Island)', lat:20.7572, lon:87.0820, rockets:'Missile/test launches', info:'Integrated Test Range for missiles & vehicles' },
+];
+
+launchSites.forEach(s => {
+  const marker = L.marker([s.lat, s.lon], { icon: makeIcon('🚀','#ff5722') });
+  marker.bindPopup(`
+    <div class="popup-title">${s.name}</div>
+    <div class="popup-row">🚀 Rockets: <span>${s.rockets}</span></div>
+    <div class="popup-row">ℹ️ <span>${s.info}</span></div>
+  `);
+  layers.sites.addLayer(marker);
+});
+
+// ── Orbital tracks (simulated) ──
+function drawOrbit(color, inclination, semiMajor, label) {
+  const pts = [];
+  for (let t=0; t<=360; t+=3) {
+    const rad = t * Math.PI / 180;
+    const inc = inclination * Math.PI / 180;
+    const x = semiMajor * Math.cos(rad);
+    const y = semiMajor * Math.sin(rad);
+    const lat =  y * Math.cos(inc);
+    const lon =  x;
+    if (lat >= -90 && lat <= 90) pts.push([lat, lon]);
+  }
+  const poly = L.polyline(pts, { color, weight:1.5, opacity:.6, dashArray:'4,4' });
+  poly.bindTooltip(label, { className:'', permanent:false, direction:'top' });
+  layers.orbits.addLayer(poly);
+}
+
+drawOrbit('#00ff88', 98,  75, 'SSO — Cartosat / RISAT');
+drawOrbit('#00d4ff', 20,  65, 'LEO — Astrosat / EOS');
+drawOrbit('#ffd700', 0.1, 80, 'GEO — INSAT / GSAT');
+drawOrbit('#c77dff', 28,  70, 'Inclined — IRNSS');
+
+// ── Simulated satellite dot moving on LEO ──
+let satAngle = 0;
+function moveSat() {
+  const rad = satAngle * Math.PI / 180;
+  const lat = 20 * Math.sin(rad);
+  const lon = 65 * Math.cos(rad);
+  if (satAngle === 0) {
+    window._satMarker = L.marker([lat, lon], { icon: makeIcon('🛸','#00d4ff'), zIndexOffset:999 });
+    window._satMarker.addTo(map);
+    window._satMarker.bindTooltip('EOS-01 (simulated orbit)', {permanent:false});
+  } else {
+    window._satMarker.setLatLng([lat, lon]);
+  }
+  satAngle = (satAngle + 1) % 360;
+}
+setInterval(moveSat, 60);
+
+loadCentres();
+</script>
+{% endblock %}

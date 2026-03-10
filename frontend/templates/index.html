@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block title %}ISRO Mission Control — Dashboard{% endblock %}
+
+{% block content %}
+<div class="page">
+
+  <!-- Stat Cards -->
+  <div class="stats-row" id="statsRow">
+    {% for i in range(6) %}
+    <div class="stat-card animate-in" style="animation-delay:{{ i*0.07 }}s">
+      <div class="label" id="sl{{ i }}">LOADING</div>
+      <div class="value" id="sv{{ i }}">--</div>
+      <div class="sub"   id="ss{{ i }}">...</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Tabs -->
+  <div style="display:flex;gap:6px;margin-bottom:22px;flex-wrap:wrap">
+    <button class="btn btn-primary btn-sm tab-btn active" onclick="switchTab(event,'spacecraft')">🛸 SPACECRAFT</button>
+    <button class="btn btn-ghost  btn-sm tab-btn"         onclick="switchTab(event,'launchers')">🚀 LAUNCHERS</button>
+    <button class="btn btn-ghost  btn-sm tab-btn"         onclick="switchTab(event,'satellites')">🛰 SATELLITES</button>
+    <button class="btn btn-ghost  btn-sm tab-btn"         onclick="switchTab(event,'centres')">🏭 CENTRES</button>
+    <button class="btn btn-ghost  btn-sm tab-btn"         onclick="switchTab(event,'analytics')">📊 ANALYTICS</button>
+  </div>
+
+  <!-- SPACECRAFT TAB -->
+  <div id="tab-spacecraft" class="tab-section">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="scQ" type="text" placeholder="SEARCH SPACECRAFT..." oninput="loadSpacecraft()"/>
+      </div>
+      <select id="scYear" onchange="loadSpacecraft()"><option value="">ALL YEARS</option></select>
+    </div>
+    <div id="scGrid" class="cards-grid"></div>
+  </div>
+
+  <!-- LAUNCHERS TAB -->
+  <div id="tab-launchers" class="tab-section" style="display:none">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="lnQ" type="text" placeholder="SEARCH LAUNCHERS..." oninput="loadLaunchers()"/>
+      </div>
+    </div>
+    <div id="lnGrid" class="cards-grid"></div>
+  </div>
+
+  <!-- SATELLITES TAB -->
+  <div id="tab-satellites" class="tab-section" style="display:none">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="satQ" type="text" placeholder="SEARCH SATELLITES..." oninput="loadSatellites()"/>
+      </div>
+      <select id="satCountry" onchange="loadSatellites()"><option value="">ALL COUNTRIES</option></select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>SATELLITE</th><th>COUNTRY</th><th>LAUNCH DATE</th><th>VEHICLE</th><th>ORBIT</th><th>ACTION</th>
+        </tr></thead>
+        <tbody id="satBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CENTRES TAB -->
+  <div id="tab-centres" class="tab-section" style="display:none">
+    <div id="centreGrid" class="cards-grid"></div>
+  </div>
+
+  <!-- ANALYTICS TAB -->
+  <div id="tab-analytics" class="tab-section" style="display:none">
+    <div class="charts-2">
+      <div class="chart-panel"><div class="chart-title">📅 LAUNCHES BY YEAR</div><div id="cYear"></div></div>
+      <div class="chart-panel"><div class="chart-title">🚀 LAUNCHER FLIGHTS</div><div id="cLauncher"></div></div>
+    </div>
+    <div class="charts-2">
+      <div class="chart-panel"><div class="chart-title">🌍 CUSTOMERS BY COUNTRY</div><div id="cCountry"></div></div>
+      <div class="chart-panel"><div class="chart-title">🎯 MISSION TYPES</div><div id="cMission"></div></div>
+    </div>
+    <div class="charts-1">
+      <div class="chart-panel"><div class="chart-title">📈 CUMULATIVE LAUNCHES</div><div id="cCumulative"></div></div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const D = {
+  paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)',
+  font:{family:'Share Tech Mono',color:'#3d6080',size:10},
+  xaxis:{gridcolor:'#0e2840',zerolinecolor:'#0e2840'},
+  yaxis:{gridcolor:'#0e2840',zerolinecolor:'#0e2840'},
+  margin:{t:10,b:36,l:46,r:10},
+  colorway:['#00d4ff','#ff5722','#00ff88','#ffd700','#c77dff','#ff006e']
+};
+const CFG = {displayModeBar:false, responsive:true};
+const YEAR_START = 1975;
+
+// ── STATS ──
+async function loadStats() {
+  const r = await fetch('/api/stats');
+  const d = await r.json();
+  const cards = [
+    ['SPACECRAFT', d.total_spacecraft,      'missions launched'],
+    ['LAUNCHERS',  d.total_launchers,        'rocket families'],
+    ['OPERATIONAL',d.operational_rockets,    'rockets active'],
+    ['SATELLITES', d.customer_satellites,    'international payloads'],
+    ['COUNTRIES',  d.countries_served,       'nations served'],
+    ['CENTRES',    d.total_centres,          'research facilities'],
+  ];
+  cards.forEach(([label, value, sub], i) => {
+    document.getElementById(`sl${i}`).textContent = label;
+    document.getElementById(`ss${i}`).textContent = sub;
+    animateNum(`sv${i}`, value);
+  });
+}
+
+function animateNum(id, target) {
+  const el = document.getElementById(id); let n=0;
+  const step = Math.max(1, Math.ceil(target/30));
+  const t = setInterval(()=>{ n=Math.min(n+step,target); el.textContent=n; if(n>=target)clearInterval(t); },40);
+}
+
+// ── SPACECRAFT ──
+let scYearsLoaded = false;
+async function loadSpacecraft() {
+  const q = document.getElementById('scQ').value;
+  const y = document.getElementById('scYear').value;
+  const r = await fetch(`/api/spacecrafts?q=${encodeURIComponent(q)}&year=${y}`);
+  const d = await r.json();
+
+  if (!scYearsLoaded) {
+    const years = [...new Set(d.data.map(s=>(s.launch_date||'').slice(0,4)).filter(Boolean))].sort().reverse();
+    const sel = document.getElementById('scYear');
+    years.forEach(y=>{ const o=new Option(y,y); sel.add(o); });
+    scYearsLoaded = true;
+  }
+
+  const grid = document.getElementById('scGrid');
+  if (!d.data.length) { grid.innerHTML='<div class="empty">NO SPACECRAFT FOUND</div>'; return; }
+  grid.innerHTML = d.data.map((s,i)=>`
+    <div class="card animate-in" style="animation-delay:${i*.04}s;cursor:pointer"
+         onclick='openDetailModal("${s.name||''}", ${JSON.stringify(s).replace(/'/g,"&#39;")}, "spacecraft")'>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div style="font-family:var(--font-display);font-size:.85rem;font-weight:700;color:#fff">${s.name||'UNKNOWN'}</div>
+        <span class="badge badge-cyan">${(s.launch_date||'').slice(0,4)||'?'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${metaField('VEHICLE', s.launch_vehicle||'–')}
+        ${metaField('SITE',    s.launch_site||'–')}
+        ${metaField('DATE',    s.launch_date||'–')}
+        ${metaField('ORBIT',   s.orbit_type||s.orbit||'LEO')}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── LAUNCHERS ──
+async function loadLaunchers() {
+  const q = document.getElementById('lnQ').value;
+  const r = await fetch(`/api/launchers?q=${encodeURIComponent(q)}`);
+  const d = await r.json();
+  const grid = document.getElementById('lnGrid');
+  if (!d.data.length) { grid.innerHTML='<div class="empty">NO LAUNCHERS FOUND</div>'; return; }
+  grid.innerHTML = d.data.map((l,i)=>{
+    const active = /op/i.test(l.status||'');
+    return `
+    <div class="card animate-in" style="animation-delay:${i*.07}s;cursor:pointer"
+         onclick='openDetailModal("${l.name||''}", ${JSON.stringify(l).replace(/'/g,"&#39;")}, "launcher")'>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div style="font-family:var(--font-display);font-size:.9rem;font-weight:700;color:#fff">${l.name||'?'}</div>
+        <span class="badge ${active?'badge-green':'badge-gray'}">${(l.status||'UNKNOWN').toUpperCase()}</span>
+      </div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:12px">${l.description||'–'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${metaField('FLIGHTS',  l.number_of_flights||'–')}
+        ${metaField('THRUST',   l.liftoff_thrust_kN ? l.liftoff_thrust_kN+' kN' : '–')}
+        ${metaField('STAGES',   l.stages||'–')}
+        ${metaField('STATUS',   l.status||'–')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── SATELLITES ──
+let satCountriesLoaded = false;
+async function loadSatellites() {
+  const q = document.getElementById('satQ').value;
+  const c = document.getElementById('satCountry').value;
+  const r = await fetch(`/api/customer_satellites?q=${encodeURIComponent(q)}&country=${encodeURIComponent(c)}`);
+  const d = await r.json();
+
+  if (!satCountriesLoaded) {
+    const cr = await fetch('/api/countries'); const cd = await cr.json();
+    const sel = document.getElementById('satCountry');
+    cd.countries.forEach(c=>{ const o=new Option(c,c); sel.add(o); });
+    satCountriesLoaded = true;
+  }
+
+  const body = document.getElementById('satBody');
+  if (!d.data.length) { body.innerHTML='<tr><td colspan="6" class="empty">NO DATA</td></tr>'; return; }
+  body.innerHTML = d.data.map((s,i)=>`
+    <tr style="animation:fadeIn .3s ${i*.02}s both">
+      <td>${s.name||'–'}</td>
+      <td>${s.country||'–'}</td>
+      <td>${s.launch_date||'–'}</td>
+      <td>${s.launch_vehicle||'–'}</td>
+      <td>${s.orbit||'–'}</td>
+      <td><button class="fav-btn" onclick='event.stopPropagation();toggleFavourite("satellite","${(s.name||'').replace(/'/g,"\\'")}",${JSON.stringify(s)})'>⭐</button></td>
+    </tr>
+  `).join('');
+}
+
+// ── CENTRES ──
+async function loadCentres() {
+  const r = await fetch('/api/centres');
+  const d = await r.json();
+  document.getElementById('centreGrid').innerHTML = d.data.map((c,i)=>`
+    <div class="card animate-in" style="animation-delay:${i*.07}s;cursor:pointer"
+         onclick='openDetailModal("${c.name||c.full_name||''}", ${JSON.stringify(c).replace(/'/g,"&#39;")}, "centre")'>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div style="font-family:var(--font-display);font-size:.9rem;font-weight:700;color:#fff">${c.name||c.acronym||'?'}</div>
+        <span class="badge badge-cyan">ISRO</span>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:.72rem;color:var(--accent);margin-bottom:8px">${c.full_name||'–'}</div>
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:10px">${c.description||'–'}</div>
+      <div style="font-family:var(--font-mono);font-size:.68rem;color:var(--muted)">📍 ${c.location||'–'}</div>
+    </div>
+  `).join('');
+}
+
+// ── ANALYTICS ──
+async function loadAnalytics() {
+  const r = await fetch('/api/analytics');
+  const d = await r.json();
+
+  // Year bar
+  Plotly.newPlot('cYear',[{
+    x:d.launches_by_year.map(r=>r.year), y:d.launches_by_year.map(r=>r.count),
+    type:'bar', marker:{color:d.launches_by_year.map(r=>r.count), colorscale:[[0,'#0e2840'],[1,'#00d4ff']], showscale:false},
+    hovertemplate:'%{x}: %{y}<extra></extra>'
+  }],{...D,height:220},CFG);
+
+  // Launcher flights bar
+  Plotly.newPlot('cLauncher',[{
+    x:d.launcher_flights.map(l=>l.flights), y:d.launcher_flights.map(l=>l.name),
+    type:'bar', orientation:'h', marker:{color:'#ff5722',opacity:.85},
+    hovertemplate:'%{y}: %{x} flights<extra></extra>'
+  }],{...D,height:220,margin:{...D.margin,l:90}},CFG);
+
+  // Country bar
+  const cc = d.by_country.slice(0,10);
+  Plotly.newPlot('cCountry',[{
+    x:cc.map(c=>c.count), y:cc.map(c=>c.country),
+    type:'bar', orientation:'h',
+    marker:{color:cc.map((_,i)=>`hsl(${190+i*12},75%,${55-i*2}%)`)},
+    hovertemplate:'%{y}: %{x}<extra></extra>'
+  }],{...D,height:280,margin:{...D.margin,l:90}},CFG);
+
+  // Mission pie
+  Plotly.newPlot('cMission',[{
+    labels:d.mission_types.map(t=>t.type), values:d.mission_types.map(t=>t.count),
+    type:'pie', hole:.4, marker:{colors:['#00d4ff','#ff5722','#00ff88','#ffd700','#c77dff']},
+    textfont:{size:9}, hovertemplate:'%{label}: %{value}<extra></extra>'
+  }],{...D,height:280,showlegend:true,legend:{font:{size:9,color:'#3d6080'},bgcolor:'rgba(0,0,0,0)'}},CFG);
+
+  // Cumulative line
+  let cum=0; const cumY=d.launches_by_year.map(r=>(cum+=r.count,cum));
+  Plotly.newPlot('cCumulative',[{
+    x:d.launches_by_year.map(r=>r.year), y:cumY,
+    type:'scatter', mode:'lines',
+    line:{color:'#00ff88',width:2.5},
+    fill:'tozeroy', fillcolor:'rgba(0,255,136,.06)',
+    hovertemplate:'%{x}: %{y} total<extra></extra>'
+  }],{...D,height:220},CFG);
+}
+
+// ── TAB switching ──
+function switchTab(e, name) {
+  document.querySelectorAll('.tab-section').forEach(s=>s.style.display='none');
+  document.querySelectorAll('.tab-btn').forEach(b=>{b.classList.remove('btn-primary');b.classList.add('btn-ghost');});
+  document.getElementById('tab-'+name).style.display='block';
+  e.target.classList.remove('btn-ghost'); e.target.classList.add('btn-primary');
+  if (name==='analytics') loadAnalytics();
+  if (name==='centres')   loadCentres();
+}
+
+// ── Meta helper ──
+function metaField(k,v) {
+  return `<div><div style="font-size:.58rem;color:var(--muted);letter-spacing:.15em;text-transform:uppercase">${k}</div>
+          <div style="font-family:var(--font-mono);font-size:.75rem;margin-top:2px">${v}</div></div>`;
+}
+
+// ── Init ──
+loadStats();
+loadSpacecraft();
+</script>
+{% endblock %}

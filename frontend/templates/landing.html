@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+{% block title %}ISRO Mission Control — Home{% endblock %}
+
+{% block head %}
+<style>
+  :root {
+    --c-black:  #02010a;
+    --c-deep:   #06021c;
+    --c-purple: #1a0533;
+    --c-blue:   #020b2e;
+    --neb1: #6b21a8; --neb2: #1e3a8a; --neb3: #4c1d95;
+    --av: #a855f7; --ab: #3b82f6; --ac: #06b6d4;
+    --tb: #f0e6ff; --tm: #9d8ec0; --td: #4a3a70;
+    --sg: #c4b5fd;
+  }
+  body { background: var(--c-black); overflow-x:hidden; }
+
+  /* ── STARFIELD ── */
+  #sf { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+  .star { position:absolute; border-radius:50%; background:#fff; animation:twinkle var(--d) ease-in-out infinite; }
+  @keyframes twinkle { 0%,100%{opacity:var(--mo);transform:scale(1)} 50%{opacity:1;transform:scale(1.5)} }
+
+  /* ── NEBULA ── */
+  .neb { position:fixed; border-radius:50%; filter:blur(90px); pointer-events:none; z-index:0; animation:ndrift 22s ease-in-out infinite alternate; }
+  .n1{width:650px;height:420px;background:rgba(107,33,168,.16);top:-120px;left:-180px;}
+  .n2{width:520px;height:520px;background:rgba(30,58,138,.13);top:35%;right:-120px;animation-delay:-8s;}
+  .n3{width:720px;height:320px;background:rgba(76,29,149,.11);bottom:5%;left:15%;animation-delay:-14s;}
+  .n4{width:420px;height:420px;background:rgba(6,182,212,.07);top:65%;right:25%;animation-delay:-5s;}
+  @keyframes ndrift { from{transform:translate(0,0) scale(1)} to{transform:translate(28px,18px) scale(1.06)} }
+
+  section { position:relative; z-index:5; }
+
+  /* ── HERO ── */
+  .hero {
+    min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    text-align:center; padding:90px 40px 70px; position:relative;
+  }
+  .ring {
+    position:absolute; border-radius:50%;
+    border:1px solid rgba(168,85,247,.18);
+    animation:rspin linear infinite;
+  }
+  .ring::after {
+    content:''; position:absolute; width:9px; height:9px; border-radius:50%;
+    background:var(--av); box-shadow:0 0 14px var(--av);
+    top:-4.5px; left:50%; transform:translateX(-50%);
+  }
+  .r1{width:280px;height:280px;top:50%;left:50%;margin:-140px 0 0 -140px;animation-duration:11s;}
+  .r2{width:480px;height:480px;top:50%;left:50%;margin:-240px 0 0 -240px;animation-duration:19s;animation-direction:reverse;border-color:rgba(59,130,246,.13);}
+  .r2::after{background:var(--ab);box-shadow:0 0 14px var(--ab);}
+  .r3{width:700px;height:700px;top:50%;left:50%;margin:-350px 0 0 -350px;animation-duration:34s;border-color:rgba(6,182,212,.1);}
+  .r3::after{background:var(--ac);box-shadow:0 0 14px var(--ac);}
+  @keyframes rspin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+  .badge {
+    display:inline-flex; align-items:center; gap:8px;
+    background:rgba(168,85,247,.1); border:1px solid rgba(168,85,247,.28);
+    border-radius:100px; padding:6px 20px; margin-bottom:30px;
+    font-family:'Share Tech Mono',monospace; font-size:.7rem;
+    color:var(--av); letter-spacing:.18em;
+    animation:fdwn .8s ease both;
+  }
+  .ldot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:blink 1.6s infinite;}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+  @keyframes fdwn{from{opacity:0;transform:translateY(-18px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes fdup{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+
+  .hero-title {
+    font-family:'Orbitron',monospace;
+    font-size:clamp(2.4rem,7vw,5.5rem);
+    font-weight:900; line-height:1.05; color:#fff;
+    animation:fdwn .8s .12s ease both; letter-spacing:-.01em;
+  }
+  .gt {
+    background:linear-gradient(135deg,var(--av) 0%,var(--ac) 50%,var(--ab) 100%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+    filter:drop-shadow(0 0 28px rgba(168,85,247,.55));
+  }
+  .hero-sub {
+    font-family:'Syne',sans-serif; font-size:clamp(.88rem,1.8vw,1.1rem);
+    color:var(--tm); max-width:560px; margin:22px auto 42px;
+    line-height:1.75; animation:fdwn .8s .28s ease both;
+  }
+  .hbtns { display:flex; gap:14px; flex-wrap:wrap; justify-content:center; animation:fdwn .8s .44s ease both; }
+  .hbtn {
+    font-family:'Share Tech Mono',monospace; font-size:.78rem; letter-spacing:.13em;
+    padding:14px 30px; border-radius:10px; border:none; cursor:pointer;
+    transition:all .3s; text-decoration:none; display:inline-block;
+  }
+  .hbtn-p {
+    background:linear-gradient(135deg,#6b21a8,#1e3a8a);
+    color:#fff; border:1px solid rgba(168,85,247,.4);
+    box-shadow:0 0 32px rgba(107,33,168,.4),inset 0 1px 0 rgba(255,255,255,.1);
+  }
+  .hbtn-p:hover{transform:translateY(-3px);box-shadow:0 0 55px rgba(107,33,168,.65),0 10px 32px rgba(0,0,0,.4);}
+  .hbtn-g {
+    background:rgba(255,255,255,.04); color:var(--tm);
+    border:1px solid rgba(255,255,255,.1);
+  }
+  .hbtn-g:hover{border-color:rgba(168,85,247,.5);color:var(--av);background:rgba(168,85,247,.08);transform:translateY(-2px);}
+
+  /* ── STATS STRIP ── */
+  .sstrip {
+    display:flex; flex-wrap:wrap; justify-content:center;
+    border-top:1px solid rgba(168,85,247,.1);
+    border-bottom:1px solid rgba(168,85,247,.1);
+    background:rgba(6,2,28,.85); backdrop-filter:blur(20px);
+  }
+  .sstat { padding:26px 44px; text-align:center; border-right:1px solid rgba(168,85,247,.1); flex:1; min-width:150px; }
+  .sstat:last-child{border-right:none;}
+  .sval {
+    font-family:'Orbitron',monospace; font-size:1.9rem; font-weight:800;
+    background:linear-gradient(135deg,#a855f7,#06b6d4);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  }
+  .slbl{font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--td);letter-spacing:.22em;margin-top:4px;}
+
+  /* ── SHARED SECTION STYLES ── */
+  .eyebrow {
+    font-family:'Share Tech Mono',monospace;font-size:.62rem;
+    color:var(--av);letter-spacing:.28em;text-transform:uppercase;
+    display:flex;align-items:center;gap:12px;margin-bottom:12px;
+  }
+  .eyebrow::before,.eyebrow::after{content:'';flex:1;height:1px;}
+  .eyebrow::before{background:linear-gradient(270deg,rgba(168,85,247,.4),transparent);}
+  .eyebrow::after {background:linear-gradient( 90deg,rgba(168,85,247,.4),transparent);}
+  .sheading {
+    font-family:'Orbitron',monospace;font-size:clamp(1.5rem,3.5vw,2.6rem);
+    font-weight:800;color:#fff;text-align:center;margin-bottom:54px;line-height:1.2;
+  }
+  .sheading span{color:var(--av);}
+
+  /* ── FEATURES ── */
+  .features{padding:100px 40px;max-width:1200px;margin:0 auto;}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;}
+  .fcard {
+    background:linear-gradient(135deg,rgba(26,5,51,.55),rgba(5,2,26,.85));
+    border:1px solid rgba(168,85,247,.13);border-radius:16px;padding:28px;
+    position:relative;overflow:hidden;transition:all .3s;
+  }
+  .fcard::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 30% 30%,rgba(168,85,247,.07),transparent 60%);opacity:0;transition:opacity .3s;}
+  .fcard:hover{border-color:rgba(168,85,247,.38);transform:translateY(-4px);box-shadow:0 20px 60px rgba(107,33,168,.22);}
+  .fcard:hover::before{opacity:1;}
+  .ficon{font-size:2.2rem;margin-bottom:14px;display:block;}
+  .fname{font-family:'Orbitron',monospace;font-size:.84rem;font-weight:700;color:#fff;margin-bottom:9px;}
+  .fdesc{font-family:'Syne',sans-serif;font-size:.81rem;color:var(--tm);line-height:1.65;}
+  .ftag{display:inline-block;margin-top:13px;font-family:'Share Tech Mono',monospace;font-size:.58rem;letter-spacing:.1em;padding:3px 10px;border-radius:4px;background:rgba(168,85,247,.1);color:var(--av);border:1px solid rgba(168,85,247,.24);}
+
+  /* ── COSMOS CARDS ── */
+  .cosmos{padding:100px 40px;background:linear-gradient(180deg,transparent,rgba(5,2,26,.4),transparent);}
+  .cosmos-in{max-width:1200px;margin:0 auto;}
+  .cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:22px;margin-top:54px;}
+  .ccard{border-radius:20px;padding:30px;position:relative;overflow:hidden;border:1px solid transparent;transition:all .4s;}
+  .ce {background:linear-gradient(135deg,rgba(30,58,138,.28),rgba(5,2,26,.9));border-color:rgba(59,130,246,.18);}
+  .cl {background:linear-gradient(135deg,rgba(76,29,149,.22),rgba(5,2,26,.9));border-color:rgba(168,85,247,.18);}
+  .cg {background:linear-gradient(135deg,rgba(6,182,212,.14),rgba(5,2,26,.9));border-color:rgba(6,182,212,.18);}
+  .cm {background:linear-gradient(135deg,rgba(100,100,120,.18),rgba(5,2,26,.9));border-color:rgba(200,200,220,.12);}
+  .cr {background:linear-gradient(135deg,rgba(153,27,27,.22),rgba(5,2,26,.9));border-color:rgba(239,68,68,.18);}
+  .cs {background:linear-gradient(135deg,rgba(161,98,7,.22),rgba(5,2,26,.9));border-color:rgba(234,179,8,.18);}
+  .ce:hover{box-shadow:0 20px 60px rgba(59,130,246,.18);border-color:rgba(59,130,246,.5);transform:translateY(-5px) scale(1.01);}
+  .cl:hover{box-shadow:0 20px 60px rgba(168,85,247,.18);border-color:rgba(168,85,247,.5);transform:translateY(-5px) scale(1.01);}
+  .cg:hover{box-shadow:0 20px 60px rgba(6,182,212,.18); border-color:rgba(6,182,212,.5); transform:translateY(-5px) scale(1.01);}
+  .cm:hover{box-shadow:0 20px 60px rgba(200,200,220,.1); transform:translateY(-5px) scale(1.01);}
+  .cr:hover{box-shadow:0 20px 60px rgba(239,68,68,.18);  border-color:rgba(239,68,68,.4); transform:translateY(-5px) scale(1.01);}
+  .cs:hover{box-shadow:0 20px 60px rgba(234,179,8,.18);  border-color:rgba(234,179,8,.4); transform:translateY(-5px) scale(1.01);}
+  .cpl{font-size:2.8rem;margin-bottom:14px;display:block;}
+  .cnm{font-family:'Orbitron',monospace;font-size:.95rem;font-weight:800;color:#fff;margin-bottom:5px;}
+  .cty{font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--td);letter-spacing:.18em;margin-bottom:13px;}
+  .cds{font-family:'Syne',sans-serif;font-size:.8rem;color:var(--tm);line-height:1.68;margin-bottom:16px;}
+  .csts{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .cst{background:rgba(255,255,255,.04);border-radius:7px;padding:9px 11px;}
+  .cst .k{font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--td);letter-spacing:.14em;}
+  .cst .v{font-family:'Orbitron',monospace;font-size:.76rem;color:#fff;margin-top:3px;}
+
+  /* ── TIMELINE ── */
+  .timeline{padding:100px 40px;max-width:860px;margin:0 auto;}
+  .tl{position:relative;padding-left:38px;}
+  .tl::before{content:'';position:absolute;left:11px;top:0;bottom:0;width:1px;background:linear-gradient(180deg,transparent,rgba(168,85,247,.4),rgba(59,130,246,.4),transparent);}
+  .ti{position:relative;margin-bottom:38px;}
+  .tdot{position:absolute;left:-31px;top:6px;width:13px;height:13px;border-radius:50%;background:var(--av);border:2px solid var(--c-black);box-shadow:0 0 14px var(--av);}
+  .tyr{font-family:'Share Tech Mono',monospace;font-size:.62rem;color:var(--av);letter-spacing:.14em;margin-bottom:5px;}
+  .tev{font-family:'Orbitron',monospace;font-size:.84rem;font-weight:700;color:#fff;margin-bottom:5px;}
+  .tds{font-family:'Syne',sans-serif;font-size:.79rem;color:var(--tm);line-height:1.6;}
+
+  /* ── AUTHOR / CREDITS ── */
+  .credits{padding:100px 40px 70px;background:linear-gradient(180deg,transparent,rgba(26,5,51,.25));position:relative;}
+  .credits::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--av),var(--ab),transparent);}
+  .cred-in{max-width:880px;margin:0 auto;}
+
+  .acard {
+    background:linear-gradient(135deg,rgba(26,5,51,.72),rgba(2,11,46,.85));
+    border:1px solid rgba(168,85,247,.22);border-radius:24px;padding:46px;
+    display:flex;align-items:center;gap:38px;flex-wrap:wrap;
+    position:relative;overflow:hidden;
+    box-shadow:0 0 90px rgba(107,33,168,.13);
+  }
+  .acard::before{content:'';position:absolute;top:-60%;right:-8%;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,.1),transparent 70%);}
+  .aavatar{
+    width:100px;height:100px;border-radius:50%;flex-shrink:0;
+    background:linear-gradient(135deg,#6b21a8,#1e3a8a);
+    display:flex;align-items:center;justify-content:center;
+    font-size:2.5rem;border:2px solid rgba(168,85,247,.4);
+    box-shadow:0 0 44px rgba(107,33,168,.45);position:relative;z-index:1;
+  }
+  .ainfo{flex:1;min-width:200px;position:relative;z-index:1;}
+  .arole{font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--av);letter-spacing:.22em;margin-bottom:8px;}
+  .aname{
+    font-family:'Orbitron',monospace;font-size:1.65rem;font-weight:900;
+    background:linear-gradient(135deg,#fff,var(--sg));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    margin-bottom:10px;
+  }
+  .abio{font-family:'Syne',sans-serif;font-size:.84rem;color:var(--tm);line-height:1.72;margin-bottom:18px;}
+  .atags{display:flex;gap:8px;flex-wrap:wrap;}
+  .atag{font-family:'Share Tech Mono',monospace;font-size:.6rem;letter-spacing:.1em;padding:5px 13px;border-radius:100px;background:rgba(168,85,247,.1);color:var(--av);border:1px solid rgba(168,85,247,.24);}
+  .atag.b{background:rgba(59,130,246,.1);color:#93c5fd;border-color:rgba(59,130,246,.24);}
+  .atag.c{background:rgba(6,182,212,.1);color:#67e8f9;border-color:rgba(6,182,212,.24);}
+
+  .tech-row{margin-top:46px;}
+  .tech-lbl{font-family:'Share Tech Mono',monospace;font-size:.62rem;color:var(--td);letter-spacing:.24em;text-align:center;margin-bottom:22px;}
+  .tech-list{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}
+  .tch{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:9px 15px;font-family:'Share Tech Mono',monospace;font-size:.68rem;color:var(--tm);transition:all .2s;}
+  .tch:hover{border-color:rgba(168,85,247,.3);color:var(--tb);}
+
+  /* ── SCROLL REVEAL ── */
+  .rv{opacity:0;transform:translateY(28px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1);}
+  .rv.vis{opacity:1;transform:translateY(0);}
+
+  @media(max-width:768px){
+    .hero{padding:100px 20px 60px;}
+    .r2,.r3{display:none;}
+    .sstat{padding:18px 22px;}
+    .features,.cosmos,.timeline,.credits{padding:60px 20px;}
+    .acard{padding:26px;flex-direction:column;text-align:center;}
+    .atags{justify-content:center;}
+    .aname{font-size:1.2rem;}
+    .cgrid{grid-template-columns:1fr;}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="sf"></div>
+<div class="neb n1"></div><div class="neb n2"></div>
+<div class="neb n3"></div><div class="neb n4"></div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="ring r1"></div>
+  <div class="ring r2"></div>
+  <div class="ring r3"></div>
+
+  <div class="badge"><span class="ldot"></span>INDIA'S SPACE PROGRAMME · EST. 1969</div>
+
+  <h1 class="hero-title">ISRO<br/><span class="gt">MISSION CONTROL</span></h1>
+
+  <p class="hero-sub">
+    A real-time tracking dashboard for every spacecraft, satellite, rocket and mission
+    ever launched by the Indian Space Research Organisation —
+    from Aryabhata (1975) to Chandrayaan-3 (2023).
+  </p>
+
+  <div class="hbtns">
+    <a href="/dashboard" class="hbtn hbtn-p">🚀 OPEN DASHBOARD</a>
+    <a href="/map"       class="hbtn hbtn-g">🗺 LIVE MAP</a>
+    <a href="#cosmos"    class="hbtn hbtn-g">↓ EXPLORE</a>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="sstrip">
+  <div class="sstat"><div class="sval" id="s1">–</div><div class="slbl">SPACECRAFT</div></div>
+  <div class="sstat"><div class="sval" id="s2">–</div><div class="slbl">LAUNCHERS</div></div>
+  <div class="sstat"><div class="sval" id="s3">–</div><div class="slbl">CUSTOMER SATS</div></div>
+  <div class="sstat"><div class="sval" id="s4">–</div><div class="slbl">COUNTRIES SERVED</div></div>
+  <div class="sstat"><div class="sval" id="s5">–</div><div class="slbl">ISRO CENTRES</div></div>
+</div>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="eyebrow rv">PLATFORM CAPABILITIES</div>
+  <h2 class="sheading rv">Everything ISRO.<br/><span>One Dashboard.</span></h2>
+  <div class="fgrid">
+    <div class="fcard rv"><span class="ficon">🛸</span><div class="fname">SPACECRAFT EXPLORER</div><div class="fdesc">Complete catalogue of every ISRO spacecraft — Aryabhata (1975) to Aditya-L1 (2023). Filter by year, search by name or rocket.</div><span class="ftag">LIVE DATA</span></div>
+    <div class="fcard rv" style="transition-delay:.08s"><span class="ficon">🚀</span><div class="fname">LAUNCHER LIBRARY</div><div class="fdesc">Full profiles of SLV, ASLV, PSLV, GSLV, LVM3 & SSLV — with flight counts, thrust specs and mission histories.</div><span class="ftag">6 ROCKET FAMILIES</span></div>
+    <div class="fcard rv" style="transition-delay:.16s"><span class="ficon">🗺</span><div class="fname">LIVE ORBITAL MAP</div><div class="fdesc">Interactive map with all ISRO centres, launch sites, orbital tracks (LEO/GEO/SSO) and real-time satellite position.</div><span class="ftag">REAL-TIME</span></div>
+    <div class="fcard rv" style="transition-delay:.24s"><span class="ficon">🌍</span><div class="fname">CUSTOMER SATELLITES</div><div class="fdesc">ISRO has launched payloads for 30+ countries. Explore the full table — filterable by country and satellite name.</div><span class="ftag">30+ COUNTRIES</span></div>
+    <div class="fcard rv" style="transition-delay:.32s"><span class="ficon">📊</span><div class="fname">ANALYTICS CHARTS</div><div class="fdesc">Five interactive Plotly charts: yearly launches, cumulative growth, mission types, launcher flights and global partnerships.</div><span class="ftag">PLOTLY.JS</span></div>
+    <div class="fcard rv" style="transition-delay:.40s"><span class="ficon">⭐</span><div class="fname">PERSONAL FAVOURITES</div><div class="fdesc">Register, log in, and bookmark any spacecraft or mission. Your saved items persist in SQLite — accessible from the Saved page.</div><span class="ftag">FLASK AUTH</span></div>
+  </div>
+</section>
+
+<!-- COSMOS INFO -->
+<section class="cosmos" id="cosmos">
+  <div class="cosmos-in">
+    <div class="eyebrow rv">OUR COSMIC NEIGHBOURHOOD</div>
+    <h2 class="sheading rv">Where ISRO's <span>Missions Venture</span></h2>
+    <div class="cgrid">
+
+      <div class="ccard ce rv">
+        <span class="cpl">🌍</span>
+        <div class="cnm">EARTH</div>
+        <div class="cty">HOME PLANET · LOW & GEO ORBIT</div>
+        <div class="cds">The launchpad for everything. ISRO's Earth-orbit fleet includes remote sensing satellites mapping every Indian field and flood, weather birds powering daily forecasts, and communication satellites beaming TV to 600M households.</div>
+        <div class="csts">
+          <div class="cst"><div class="k">DIAMETER</div><div class="v">12,742 km</div></div>
+          <div class="cst"><div class="k">ISRO SATS</div><div class="v">50+</div></div>
+          <div class="cst"><div class="k">LEO ALTITUDE</div><div class="v">200–2000 km</div></div>
+          <div class="cst"><div class="k">GEO ALTITUDE</div><div class="v">35,786 km</div></div>
+        </div>
+      </div>
+
+      <div class="ccard cl rv" style="transition-delay:.08s">
+        <span class="cpl">🛰️</span>
+        <div class="cnm">LOW EARTH ORBIT</div>
+        <div class="cty">SSO · LEO · INCLINED ORBITS</div>
+        <div class="cds">Home to ISRO's Earth observation fleet. CARTOSAT maps terrain with 0.25m resolution, RISAT uses radar to see through clouds, and EOS-01 monitors agriculture, borders and disaster zones. PSLV is the undisputed king of SSO launches.</div>
+        <div class="csts">
+          <div class="cst"><div class="k">ALTITUDE</div><div class="v">400–800 km</div></div>
+          <div class="cst"><div class="k">PSLV FLIGHTS</div><div class="v">60+</div></div>
+          <div class="cst"><div class="k">ORBITAL PERIOD</div><div class="v">~90 min</div></div>
+          <div class="cst"><div class="k">ORBITAL SPEED</div><div class="v">7.8 km/s</div></div>
+        </div>
+      </div>
+
+      <div class="ccard cg rv" style="transition-delay:.16s">
+        <span class="cpl">📡</span>
+        <div class="cnm">GEOSTATIONARY ORBIT</div>
+        <div class="cty">GEO · COMMUNICATION · WEATHER</div>
+        <div class="cds">INSAT and GSAT satellites hover here at 35,786 km, appearing fixed from Earth. They power DTH television, broadband internet, EDUSAT e-learning channels, meteorology forecasts and cyclone/flood early-warning systems.</div>
+        <div class="csts">
+          <div class="cst"><div class="k">ALTITUDE</div><div class="v">35,786 km</div></div>
+          <div class="cst"><div class="k">INSAT/GSAT</div><div class="v">20+ sats</div></div>
+          <div class="cst"><div class="k">PERIOD</div><div class="v">24 hours</div></div>
+          <div class="cst"><div class="k">LAUNCHERS</div><div class="v">GSLV/LVM3</div></div>
+        </div>
+      </div>
+
+      <div class="ccard cm rv" style="transition-delay:.24s">
+        <span class="cpl">🌕</span>
+        <div class="cnm">THE MOON</div>
+        <div class="cty">LUNAR ORBIT · SURFACE LANDING</div>
+        <div class="cds">Chandrayaan-1 (2008) confirmed water on the Moon. Chandrayaan-2 (2019) mapped its surface with extreme precision. Chandrayaan-3 (Aug 23, 2023) soft-landed Vikram near the lunar south pole — a world first that no other nation had achieved.</div>
+        <div class="csts">
+          <div class="cst"><div class="k">DISTANCE</div><div class="v">384,400 km</div></div>
+          <div class="cst"><div class="k">MISSIONS</div><div class="v">3 (C1/C2/C3)</div></div>
+          <div class="cst"><div class="k">LANDING DATE</div><div class="v">Aug 23 2023</div></div>
+          <div class="cst"><div class="k">LANDING SITE</div><div class="v">South Pole</div></div>
+        </div>
+      </div>
+
+      <div class="ccard cr rv" style="transition-delay:.32s">
+        <span class="cpl">🔴</span>
+        <div class="cnm">MARS</div>
+        <div class="cty">INTERPLANETARY · MOM MISSION</div>
+        <div class="cds">Mangalyaan (MOM, 2013) made India the 4th space agency to reach Mars — and the first nation to succeed on the very first attempt. At just ₹450 crore (less than Hollywood blockbusters), it redefined cost-efficient deep space exploration.</div>
+        <div class="csts">
+          <div class="cst"><div class="k">DISTANCE</div><div class="v">~225M km</div></div>
+          <div class="cst"><div class="k">MISSIONS</div><div class="v">1 (MOM)</div></div>
+          <div class="cst"><div class="k">ARRIVAL</div><div class="v">Sep 24 2014</div></div>
+          <div class="cst"><div class="k">COST</div><div class="v">₹450 Crore</div></div>
+        </div>
+      </div>
+
+      <div class="ccard cs rv" style="transition-delay:.40s">
+        <span class="cpl">☀️</span>
+        <div class="cnm">THE SUN — L1 POINT</div>
+        <div class="cty">LAGRANGE POINT 1 · SOLAR STUDY</div>
+        <div class="cds">Aditya-L1 (Sep 2023) is India's first dedicated solar observatory. Positioned at the L1 Lagrange point 1.5 million km sunward, its 7 payloads study solar winds, coronal mass ejections and space weather — 24/7 without any eclipses.</div>
+        <div class="csts">
+          <div class="cst"><div class="k">L1 DISTANCE</div><div class="v">1.5M km</div></div>
+          <div class="cst"><div class="k">LAUNCH</div><div class="v">Sep 2 2023</div></div>
+          <div class="cst"><div class="k">PAYLOADS</div><div class="v">7</div></div>
+          <div class="cst"><div class="k">LAUNCHER</div><div class="v">PSLV-C57</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- TIMELINE -->
+<section class="timeline">
+  <div class="eyebrow rv">KEY MILESTONES</div>
+  <h2 class="sheading rv">A <span>Legacy</span> of Firsts</h2>
+  <div class="tl">
+    <div class="ti rv"><div class="tdot"></div><div class="tyr">1975</div><div class="tev">Aryabhata — India's First Satellite</div><div class="tds">Launched on a Soviet Intercosmos rocket, Aryabhata was India's debut in space — named after the legendary 5th-century mathematician and astronomer.</div></div>
+    <div class="ti rv"><div class="tdot"></div><div class="tyr">1980</div><div class="tev">SLV-3 — First Indigenous Rocket</div><div class="tds">India became only the 7th nation to build and launch its own orbital rocket, successfully deploying the Rohini satellite from Sriharikota.</div></div>
+    <div class="ti rv"><div class="tdot"></div><div class="tyr">2008</div><div class="tev">Chandrayaan-1 — Water on the Moon</div><div class="tds">ISRO's Moon Impact Probe confirmed water molecules on the lunar surface — a discovery of immense global scientific significance.</div></div>
+    <div class="ti rv"><div class="tdot"></div><div class="tyr">2014</div><div class="tev">Mangalyaan — Mars on First Attempt</div><div class="tds">India became the first nation to reach Martian orbit on its maiden attempt, joining an elite club of space agencies at a fraction of usual costs.</div></div>
+    <div class="ti rv"><div class="tdot"></div><div class="tyr">2017</div><div class="tev">PSLV-C37 — 104 Satellites, One Rocket</div><div class="tds">A single PSLV simultaneously deployed 104 satellites — setting a world record and cementing ISRO's reputation as a premium launch partner.</div></div>
+    <div class="ti rv"><div class="tdot"></div><div class="tyr">2023</div><div class="tev">Chandrayaan-3 — South Pole Landing</div><div class="tds">Vikram lander touched down near the lunar south pole on August 23 — a world first. India became only the 4th country to soft-land on the Moon.</div></div>
+  </div>
+</section>
+
+<!-- CREDITS / AUTHOR -->
+<section class="credits" id="credits">
+  <div class="cred-in">
+    <div class="eyebrow rv">PROJECT AUTHOR</div>
+    <h2 class="sheading rv">Built by a <span>Space Enthusiast</span></h2>
+
+    <div class="acard rv">
+      <div class="aavatar">👨‍💻</div>
+      <div class="ainfo">
+        <div class="arole">DEVELOPER &amp; CREATOR</div>
+        <div class="aname">Anjum A Khan</div>
+        <div class="abio">
+          A passionate developer and space enthusiast who built the ISRO Mission Control Dashboard
+          to make India's extraordinary space programme more accessible and explorable for everyone.
+          Combining a love for Python, data engineering, and the cosmos —
+          this project tracks every rocket, satellite and mission ISRO has ever launched,
+          from the first Aryabhata in 1975 to Aditya-L1 in 2023.
+        </div>
+        <div class="atags">
+          <span class="atag">PYTHON</span>
+          <span class="atag b">FLASK</span>
+          <span class="atag c">DATA ENGINEERING</span>
+          <span class="atag">SPACE TECH</span>
+          <span class="atag b">ISRO FAN</span>
+          <span class="atag c">WEB DEV</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tech-row rv">
+      <div class="tech-lbl">BUILT WITH</div>
+      <div class="tech-list">
+        <div class="tch">🐍 Python 3.11</div>
+        <div class="tch">🌶 Flask 3.0</div>
+        <div class="tch">🗄 SQLAlchemy</div>
+        <div class="tch">🔒 Flask-Login</div>
+        <div class="tch">📊 Plotly.js</div>
+        <div class="tch">🗺 Leaflet.js</div>
+        <div class="tch">🚀 ISRO Open API</div>
+        <div class="tch">🤖 GitHub Actions CI/CD</div>
+        <div class="tch">🐳 Docker</div>
+        <div class="tch">🌌 CSS Animations</div>
+        <div class="tch">✨ Vanilla JS</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Starfield
+(function(){
+  const sf=document.getElementById('sf'),n=240;
+  for(let i=0;i<n;i++){
+    const s=document.createElement('div'); s.className='star';
+    const sz=(Math.random()*2.4+.4).toFixed(1);
+    const d=(Math.random()*4+2).toFixed(1);
+    const mo=(Math.random()*.3+.08).toFixed(2);
+    s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--d:${d}s;--mo:${mo};animation-delay:${(Math.random()*6).toFixed(1)}s;opacity:${mo}`;
+    sf.appendChild(s);
+  }
+})();
+
+// Stats
+async function loadStats(){
+  try{
+    const d=await(await fetch('/api/stats')).json();
+    const pairs=[['s1',d.total_spacecraft],['s2',d.total_launchers],['s3',d.customer_satellites],['s4',d.countries_served],['s5',d.total_centres]];
+    pairs.forEach(([id,t])=>{
+      const el=document.getElementById(id); let n=0;
+      const step=Math.max(1,Math.ceil(t/40));
+      const ti=setInterval(()=>{n=Math.min(n+step,t);el.textContent=n;if(n>=t)clearInterval(ti);},35);
+    });
+  }catch(e){['s1','s2','s3','s4','s5'].forEach(id=>document.getElementById(id).textContent='–');}
+}
+loadStats();
+
+// Scroll reveal
+const obs=new IntersectionObserver(es=>es.forEach(e=>e.isIntersecting&&e.target.classList.add('vis')),{threshold:.08});
+document.querySelectorAll('.rv').forEach(el=>obs.observe(el));
+</script>
+{% endblock %}

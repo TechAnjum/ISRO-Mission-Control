@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}ISRO — My Favourites{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="section-header" style="margin-bottom:24px">
+    <div>
+      <div style="font-family:var(--font-display);font-size:1rem;font-weight:800;color:#fff">⭐ SAVED MISSIONS</div>
+      <div style="font-family:var(--font-mono);font-size:.7rem;color:var(--muted);margin-top:4px">Your tracked spacecraft, launchers &amp; satellites</div>
+    </div>
+    <div id="favCount" style="font-family:var(--font-display);font-size:1.8rem;font-weight:800;color:gold"></div>
+  </div>
+
+  <div id="notLoggedIn" style="display:none">
+    <div style="text-align:center;padding:80px 20px">
+      <div style="font-size:3rem;margin-bottom:16px">🔐</div>
+      <div style="font-family:var(--font-display);font-size:.85rem;color:#fff;margin-bottom:10px">LOGIN REQUIRED</div>
+      <div style="font-family:var(--font-mono);font-size:.75rem;color:var(--muted);margin-bottom:24px">Sign in to save and view your favourite missions</div>
+      <button class="btn btn-primary" onclick="openAuthModal()">LOGIN TO MISSION CONTROL</button>
+    </div>
+  </div>
+
+  <div id="favContent" style="display:none">
+
+    <!-- Filter by type -->
+    <div class="toolbar">
+      <button class="btn btn-primary btn-sm ftype-btn active" onclick="filterFavs(event,'all')">ALL</button>
+      <button class="btn btn-ghost  btn-sm ftype-btn" onclick="filterFavs(event,'spacecraft')">🛸 SPACECRAFT</button>
+      <button class="btn btn-ghost  btn-sm ftype-btn" onclick="filterFavs(event,'launcher')">🚀 LAUNCHERS</button>
+      <button class="btn btn-ghost  btn-sm ftype-btn" onclick="filterFavs(event,'satellite')">🛰 SATELLITES</button>
+    </div>
+
+    <div id="favGrid" class="cards-grid"></div>
+    <div id="favEmpty" class="empty" style="display:none">
+      No saved items yet. Browse the dashboard and click ⭐ to save.
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allFavs = [];
+let activeType = 'all';
+
+function onAuthChange() { initFavourites(); }
+
+async function initFavourites() {
+  if (!currentUser) {
+    document.getElementById('notLoggedIn').style.display = 'block';
+    document.getElementById('favContent').style.display = 'none';
+    return;
+  }
+  document.getElementById('notLoggedIn').style.display = 'none';
+  document.getElementById('favContent').style.display = 'block';
+  loadFavourites();
+}
+
+async function loadFavourites() {
+  const r = await fetch('/api/favourites');
+  const d = await r.json();
+  allFavs = d.favourites || [];
+  document.getElementById('favCount').textContent = allFavs.length;
+  renderFavs();
+}
+
+function filterFavs(e, type) {
+  activeType = type;
+  document.querySelectorAll('.ftype-btn').forEach(b=>{ b.classList.remove('btn-primary'); b.classList.add('btn-ghost'); });
+  e.target.classList.remove('btn-ghost'); e.target.classList.add('btn-primary');
+  renderFavs();
+}
+
+function renderFavs() {
+  const filtered = activeType === 'all' ? allFavs : allFavs.filter(f=>f.item_type===activeType);
+  const grid = document.getElementById('favGrid');
+  const empty = document.getElementById('favEmpty');
+  if (!filtered.length) { grid.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display = 'none';
+
+  const icons = { spacecraft:'🛸', launcher:'🚀', satellite:'🛰', centre:'🏭' };
+
+  grid.innerHTML = filtered.map((f,i) => {
+    const data = f.item_data || {};
+    const icon = icons[f.item_type] || '⭐';
+    const sub  = data.launch_date || data.status || data.location || '';
+    const desc = data.description || data.launch_vehicle || data.country || '';
+    return `
+    <div class="card animate-in" style="animation-delay:${i*.04}s">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div style="display:flex;gap:10px;align-items:center">
+          <span style="font-size:1.3rem">${icon}</span>
+          <div>
+            <div style="font-family:var(--font-display);font-size:.82rem;font-weight:700;color:#fff">${f.item_name}</div>
+            <div style="font-family:var(--font-mono);font-size:.65rem;color:var(--muted);margin-top:2px">${sub}</div>
+          </div>
+        </div>
+        <span class="badge badge-cyan">${f.item_type.toUpperCase()}</span>
+      </div>
+      ${desc ? `<div style="font-size:.75rem;color:var(--muted);margin-bottom:12px">${desc}</div>` : ''}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <div style="font-family:var(--font-mono);font-size:.62rem;color:var(--muted)">Saved: ${f.saved_at.slice(0,10)}</div>
+        <button class="btn btn-danger btn-sm" onclick="removeFav(${f.id}, this)">REMOVE</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function removeFav(id, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  const r = await fetch(`/api/favourites/${id}`, { method:'DELETE' });
+  if (r.ok) {
+    showToast('Removed from favourites', 'info');
+    loadFavourites();
+  } else {
+    btn.disabled = false; btn.textContent = 'REMOVE';
+    showToast('Error removing', 'error');
+  }
+}
+
+// Run on page load once auth is resolved
+setTimeout(initFavourites, 300);
+</script>
+{% endblock %}
