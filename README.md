@@ -345,9 +345,9 @@ docker run -p 5000:5000 -e SECRET_KEY=your-secret isro-dashboard
 
 ---
 
-## 👨‍💻 Author
+##  Author
 
-### Anjum A Khan
+### 👩🏼‍💻 Anjum A Khan
 
 > *Developer · Space Enthusiast · Python Developer*
 
